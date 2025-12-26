@@ -94,8 +94,7 @@ void Fsm::on_message(const json& j)
 
     // Observe BUS state updates
     if (j.contains("component") && j.contains("status")) {
-        observed_[j["component"]] = j;
-
+        observed_[j["component"].get<std::string>()] = j;
         if (regs_.run_)
             step();
 
@@ -157,6 +156,9 @@ bool Fsm::evaluate_transition(const Transition& t)
 
         std::string comp  = key.substr(0, dot);
         std::string field = key.substr(dot + 1);
+
+        trim(comp);
+        trim(field);
 
         auto obs = observed_.find(comp);
         if (obs == observed_.end())

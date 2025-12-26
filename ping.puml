@@ -4,6 +4,7 @@ state INIT
 state CONFIGURE
 state TX
 state WAIT_TX
+state OBSERVE_TX
 state WAIT_REPLY
 state GOT_REPLY
 state DONE
@@ -11,7 +12,8 @@ state DONE
 INIT --> CONFIGURE : true
 CONFIGURE --> TX : true
 TX --> WAIT_TX : true
-WAIT_TX --> WAIT_REPLY : NET.tx_done=true
+WAIT_TX --> OBSERVE_TX : true
+OBSERVE_TX --> WAIT_REPLY : NET.tx_done=true
 WAIT_REPLY --> WAIT_REPLY : NET.rx_done=false
 WAIT_REPLY --> GOT_REPLY : NET.rx_done=true
 GOT_REPLY --> DONE : true
@@ -72,6 +74,13 @@ note right of TX
 end note
 
 note right of WAIT_TX
+{
+  "tx_fire": false,
+  "rx_fire": false
+}
+end note
+
+note right of OBSERVE_TX
 {
   "tx_fire": false,
   "rx_fire": false
