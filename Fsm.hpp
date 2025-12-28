@@ -36,6 +36,7 @@ class Fsm : public mpp::Component<Fsm>
 {
 public:
     explicit Fsm(int sba);
+    
 
     json serialize_registers() const;
     void apply_snapshot(const json& j);
@@ -43,6 +44,9 @@ public:
     void on_message(const json& j);
     void on_parse_error(const json::parse_error& e);
     void on_unknown_parse_error();
+
+protected:
+    const char* component_name() const override { return "FSM"; }
 
 private:
     struct Transition {

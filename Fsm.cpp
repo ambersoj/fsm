@@ -129,6 +129,8 @@ void Fsm::step()
         regs_.transition_fired_ = true;
         regs_.last_error_.clear();
 
+// COMMIT: regs_.transition_fired = true
+
         auto note = state_notes_.find(t.to);
         if (note != state_notes_.end()) {
             regs_.last_applied_state_ = t.to;
