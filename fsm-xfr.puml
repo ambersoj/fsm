@@ -1,0 +1,55 @@
+@startuml
+
+state XFR_IDLE
+state XFR_INIT
+state XFR_OPEN
+state XFR_SEND
+state XFR_WAIT_TX
+state XFR_WAIT_RX
+state XFR_DONE
+
+XFR_IDLE --> XFR_INIT : true
+XFR_INIT --> XFR_OPEN : belief FSM.XFR.start
+XFR_OPEN --> XFR_SEND : belief FSM.NET.ready
+
+XFR_SEND --> XFR_WAIT_TX : true
+XFR_WAIT_TX --> XFR_WAIT_RX : belief NET.tx_done
+XFR_WAIT_RX --> XFR_DONE : belief NET.rx_done
+
+note right of XFR_INIT
+{
+  "_commit": { "subject": "FSM.XFR.init" }
+}
+end note
+
+note right of XFR_OPEN
+{
+  "_commit": { "subject": "FSM.XFR.open" }
+}
+end note
+
+note right of XFR_SEND
+{
+  "_commit": { "subject": "FSM.XFR.send_chunk" }
+}
+end note
+
+note right of XFR_WAIT_TX
+{
+  "_tck": { "enable": true }
+}
+end note
+
+note right of XFR_WAIT_RX
+{
+  "_tck": { "enable": true }
+}
+end note
+
+note right of XFR_DONE
+{
+  "_commit": { "subject": "FSM.XFR.complete" }
+}
+end note
+
+@enduml

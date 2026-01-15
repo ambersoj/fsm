@@ -1,0 +1,31 @@
+@startuml
+skinparam componentStyle rectangle
+
+component TCK {
+  + emits tick
+}
+
+component FSM {
+  + step()
+  + evaluate guards
+  + route intent
+}
+
+component Component {
+  + owns registers
+  + performs work
+}
+
+database BLS {
+  + belief ledger
+  + read-only to FSM
+}
+
+TCK --> FSM : tick
+FSM --> BLS : read beliefs
+FSM --> BLS : _commit
+FSM --> Component : _send
+FSM --> TCK : _tck (enable/disable/rate)
+
+Component --> BLS : commit beliefs
+@enduml

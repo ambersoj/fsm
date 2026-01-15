@@ -1,0 +1,114 @@
+@startuml
+
+state INIT
+state CONFIGURE
+state TX
+state WAIT_TX
+state OBSERVE_TX
+state WAIT_REPLY
+state GOT_REPLY
+state DONE
+
+INIT --> CONFIGURE : true
+CONFIGURE --> TX : true
+TX --> WAIT_TX : true
+WAIT_TX --> OBSERVE_TX : true
+OBSERVE_TX --> WAIT_REPLY : NET.tx_done=true
+WAIT_REPLY --> WAIT_REPLY : NET.rx_done=false
+WAIT_REPLY --> GOT_REPLY : NET.rx_done=true
+GOT_REPLY --> DONE : true
+
+note right of INIT
+{
+  "libnet_create": true,
+  "libnet_destroy": true,
+
+  "eth_enabled": true,
+  "ip4_enabled": true,
+  "icmp4_enabled": true,
+
+  "tx_fire": false,
+  "rx_fire": false
+}
+end note
+
+note right of CONFIGURE
+{
+  "libnet_create": true,
+  "libnet_destroy": false,
+  "libnet_device": "eno1",
+
+  "eth_enabled": true,
+  "eth_src_mac": "ec:b1:d7:52:8c:52",
+  "eth_dst_mac": "5c:d9:98:5f:16:54",
+  "eth_type": 2048,
+
+  "ip4_enabled": true,
+  "ip4_src": "192.168.0.105",
+  "ip4_dst": "192.168.0.1",
+  "ip4_ttl": 64,
+
+  "icmp4_enabled": true,
+  "icmp4_type": 8,
+  "icmp4_code": 0,
+  "icmp4_id": 123,
+  "icmp4_seq": 0,
+  "icmp4_payload": "MPP-HELLO-0001",
+
+  "pcap_create": true,
+  "pcap_device": "eno1",
+
+  "pcap_filter": "icmp and ether dst ec:b1:d7:52:8c:52",
+  "pcap_set_filter": true,
+
+  "tx_fire": false,
+  "rx_fire": false
+}
+end note
+
+note right of TX
+{
+  "tx_fire": true,
+  "rx_fire": false
+}
+end note
+
+note right of WAIT_TX
+{
+  "tx_fire": false,
+  "rx_fire": false
+}
+end note
+
+note right of OBSERVE_TX
+{
+  "tx_fire": false,
+  "rx_fire": false
+}
+end note
+
+note right of WAIT_REPLY
+{
+  "pcap_create": true,
+  "pcap_device": "eno1",
+  "tx_fire": false,
+  "rx_fire": true
+}
+end note
+
+note right of GOT_REPLY
+{
+  "tx_fire": false,
+  "rx_fire": false
+}
+end note
+
+note right of DONE
+{
+  "libnet_destroy": true,
+  "tx_fire": false,
+  "rx_fire": false
+}
+end note
+
+@enduml

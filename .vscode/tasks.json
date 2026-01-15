@@ -1,0 +1,28 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build fsm",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "-std=c++20",
+                "-g",
+                "-O0",
+                "-pthread",
+                "-o",
+                "fsm",
+                "main.cpp",
+                "Fsm.cpp"
+            ],
+            "options": {
+                "cwd": "/usr/local/mppxfr/fsm"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
+        }
+    ]
+}

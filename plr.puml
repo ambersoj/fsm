@@ -1,0 +1,18 @@
+@startuml
+
+state IDLE
+state INIT
+
+IDLE --> INIT : true
+
+note right of IDLE
+{
+}
+end note
+
+note right of INIT
+{
+  "enable": true,
+  "target_sba": 4002
+}
+end note

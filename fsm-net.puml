@@ -1,0 +1,43 @@
+@startuml
+
+state NET_IDLE
+state NET_INIT
+state NET_READY
+state NET_SEND
+state NET_WAIT_TX
+state NET_DONE
+
+NET_IDLE --> NET_INIT : true
+NET_INIT --> NET_READY : belief FSM.XFR.init
+NET_READY --> NET_SEND : belief FSM.XFR.send_chunk
+NET_SEND --> NET_WAIT_TX : true
+NET_WAIT_TX --> NET_DONE : belief NET.tx_done
+NET_DONE --> NET_READY : true
+
+note right of NET_INIT
+{
+  "_commit": { "subject": "FSM.NET.ready" }
+}
+end note
+
+note right of NET_SEND
+{
+  "_send": {
+    "icmp4_payload": "$REG.chunk_payload"
+  }
+}
+end note
+
+note right of NET_WAIT_TX
+{
+  "_tck": { "enable": true }
+}
+end note
+
+note right of NET_DONE
+{
+  "_commit": { "subject": "FSM.NET.chunk_sent" }
+}
+end note
+
+@enduml
