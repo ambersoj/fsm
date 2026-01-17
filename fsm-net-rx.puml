@@ -7,7 +7,7 @@ state NET_WAIT_RX
 state NET_DONE
 
 NET_IDLE --> NET_INIT : true
-NET_INIT --> NET_READY : belief FSM.XFR.init
+NET_INIT --> NET_READY : true
 NET_READY --> NET_WAIT_RX : true
 NET_WAIT_RX --> NET_DONE : belief NET.rx_done
 NET_DONE --> NET_READY : true
