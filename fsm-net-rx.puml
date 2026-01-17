@@ -1,0 +1,55 @@
+@startuml
+
+state NET_IDLE
+state NET_INIT
+state NET_READY
+state NET_WAIT_RX
+state NET_DONE
+
+NET_IDLE --> NET_INIT : true
+NET_INIT --> NET_READY : belief FSM.XFR.init
+NET_READY --> NET_WAIT_RX : true
+NET_WAIT_RX --> NET_DONE : belief NET.rx_done
+NET_DONE --> NET_READY : true
+
+note right of NET_INIT
+{
+  "libnet_create": true,
+  "libnet_destroy": false,
+
+  "pcap_create": true,
+  "pcap_destroy": false,
+
+  "libnet_device": "enp1s0",
+  "pcap_device": "enp1s0",
+
+  "eth_enabled": true,
+  "ip4_enabled": true,
+  "icmp4_enabled": true,
+
+  "tx_fire": false,
+  "rx_fire": false,
+
+  "_commit": { "subject": "FSM.NET.ready" }
+}
+end note
+
+note right of NET_WAIT_RX
+{
+  "rx_fire": true,
+  "tx_fire": false,
+
+  "_tck": { "enable": true }
+}
+end note
+
+note right of NET_DONE
+{
+  "rx_fire": false,
+  "tx_fire": false,
+
+  "_commit": { "subject": "NET.rx_done" }
+}
+end note
+
+@enduml

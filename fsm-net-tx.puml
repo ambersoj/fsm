@@ -1,0 +1,102 @@
+@startuml
+
+state NET_IDLE
+state NET_INIT
+state NET_CONFIGURE
+state NET_READY
+state NET_TX
+state NET_WAIT_TX
+state NET_WAIT_RX
+state NET_DONE
+
+NET_IDLE --> NET_INIT : true
+NET_INIT --> NET_CONFIGURE : true
+NET_CONFIGURE --> NET_READY : true
+
+NET_READY --> NET_TX : belief FSM.XFR.send_chunk
+NET_TX --> NET_WAIT_TX : true
+NET_WAIT_TX --> NET_WAIT_RX : belief NET.tx_done
+NET_WAIT_RX --> NET_DONE : belief NET.rx_done
+NET_DONE --> NET_READY : true
+
+note right of NET_INIT
+{
+  "libnet_create": true,
+  "libnet_destroy": true,
+
+  "eth_enabled": true,
+  "ip4_enabled": true,
+  "icmp4_enabled": true,
+
+  "tx_fire": false,
+  "rx_fire": false
+}
+end note
+
+note right of NET_CONFIGURE
+{
+  "libnet_create": true,
+  "libnet_destroy": false,
+  "libnet_device": "eno1",
+
+  "eth_enabled": true,
+  "eth_src_mac": "ec:b1:d7:52:8c:52",
+  "eth_dst_mac": "bc:e9:2f:80:3b:56",
+  "eth_type": 2048,
+
+  "ip4_enabled": true,
+  "ip4_src": "192.168.0.105",
+  "ip4_dst": "192.168.0.109",
+  "ip4_ttl": 64,
+
+  "icmp4_enabled": true,
+  "icmp4_type": 8,
+  "icmp4_code": 0,
+  "icmp4_id": 4242,
+  "icmp4_seq": 1,
+  "icmp4_payload": "XFR-105-to-109-test-0001",
+
+  "pcap_create": true,
+  "pcap_device": "eno1",
+  "pcap_filter": "icmp and ether dst ec:b1:d7:52:8c:52",
+  "pcap_set_filter": true,
+
+  "tx_fire": false,
+  "rx_fire": false
+}
+end note
+
+note right of NET_READY
+{
+  "_commit": { "subject": "FSM.NET.ready" }
+}
+end note
+
+note right of NET_TX
+{
+  "tx_fire": true,
+  "rx_fire": false
+}
+end note
+
+note right of NET_WAIT_TX
+{
+  "tx_fire": false,
+  "rx_fire": false
+}
+end note
+
+note right of NET_WAIT_RX
+{
+  "tx_fire": false,
+  "rx_fire": true
+}
+end note
+
+note right of NET_DONE
+{
+  "_commit": { "subject": "FSM.NET.chunk_sent" }
+}
+end note
+
+@enduml
