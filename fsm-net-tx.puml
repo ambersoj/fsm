@@ -17,12 +17,17 @@ NET_READY --> NET_TX : belief FSM.XFR.send_chunk
 NET_TX --> NET_WAIT_TX : true
 NET_WAIT_TX --> NET_WAIT_RX : belief NET.tx_done
 NET_WAIT_RX --> NET_DONE : belief NET.rx_done
-NET_DONE --> NET_READY : true
+NET_DONE
+
+note right of NET_IDLE
+{
+}
 
 note right of NET_INIT
 {
+  "_send": {
   "libnet_create": true,
-  "libnet_destroy": true,
+  "libnet_destroy": false,
 
   "eth_enabled": true,
   "ip4_enabled": true,
@@ -30,13 +35,14 @@ note right of NET_INIT
 
   "tx_fire": false,
   "rx_fire": false
+  }
 }
 end note
 
 note right of NET_CONFIGURE
 {
+  "_send": {
   "libnet_create": true,
-  "libnet_destroy": false,
   "libnet_device": "eno1",
 
   "eth_enabled": true,
@@ -58,11 +64,9 @@ note right of NET_CONFIGURE
 
   "pcap_create": true,
   "pcap_device": "eno1",
-  "pcap_filter": "icmp and ether dst ec:b1:d7:52:8c:52",
-  "pcap_set_filter": true,
-
-  "tx_fire": false,
-  "rx_fire": false
+  "pcap_filter": "icmp and (host 192.168.0.105 or host 192.168.0.109)",
+  "pcap_set_filter": true
+  }
 }
 end note
 
@@ -74,27 +78,41 @@ end note
 
 note right of NET_TX
 {
+  "_send": {
   "tx_fire": true,
   "rx_fire": false
+  }
 }
 end note
 
 note right of NET_WAIT_TX
 {
-  "tx_fire": false,
-  "rx_fire": false
+  "_send": {
+    "net_rx_enable": false,
+    "tx_fire": false,
+    "rx_fire": false
+  }
 }
+
 end note
 
 note right of NET_WAIT_RX
 {
+  "_send": {
+  "net_rx_enable": true,
   "tx_fire": false,
   "rx_fire": true
+  }
 }
 end note
 
 note right of NET_DONE
 {
+  "_send": {
+  "net_rx_enable": false,
+  "tx_fire": false,
+  "rx_fire": false
+  }
   "_commit": { "subject": "FSM.NET.chunk_sent" }
 }
 end note
