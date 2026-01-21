@@ -1,53 +1,98 @@
 @startuml
 
 state NET_IDLE
+state NET_CONFIGURE
 state NET_INIT
 state NET_READY
 state NET_WAIT_RX
 state NET_DONE
 
-NET_IDLE --> NET_INIT : true
+NET_IDLE --> NET_CONFIGURE : true
+NET_CONFIGURE --> NET_INIT : true
 NET_INIT --> NET_READY : true
 NET_READY --> NET_WAIT_RX : true
 NET_WAIT_RX --> NET_DONE : belief NET.rx_done
-NET_DONE --> NET_READY : true
+NET_DONE
+
+note right of NET_IDLE
+{
+}
+end note
 
 note right of NET_INIT
 {
-  "libnet_create": true,
-  "libnet_destroy": false,
+  "_send": {
+    "libnet_create": true,
+    "libnet_destroy": false,
 
-  "pcap_create": true,
-  "pcap_destroy": false,
+    "pcap_create": true,
+    "pcap_destroy": false,
 
-  "libnet_device": "enp1s0",
-  "pcap_device": "enp1s0",
+    "libnet_device": "enp1s0",
+    "pcap_device": "enp1s0",
 
-  "eth_enabled": true,
-  "ip4_enabled": true,
-  "icmp4_enabled": true,
+    "pcap_filter": "icmp",
+    "pcap_set_filter": true,
 
-  "tx_fire": false,
-  "rx_fire": false,
+    "eth_enabled": true,
+    "ip4_enabled": true,
+    "icmp4_enabled": true,
 
-  "_commit": { "subject": "FSM.NET.ready" }
+    "tx_fire": false,
+    "rx_fire": false
+  },
+  "_commit": { "subject": "FSM.NET.ready" },
+  "_tck": { "enable": true }
+}
+end note
+
+note right of NET_CONFIGURE
+{
+  "_send": {
+    "eth_enabled": true,
+    "eth_src_mac": "bc:e9:2f:80:3b:56",
+    "eth_dst_mac": "ec:b1:d7:52:8c:52",
+    "eth_type": 2048,
+
+    "ip4_enabled": true,
+    "ip4_src": "192.168.0.109",
+    "ip4_dst": "192.168.0.105",
+    "ip4_ttl": 64,
+
+    "icmp4_enabled": true,
+    "icmp4_type": 8,
+    "icmp4_code": 0,
+    "icmp4_id": 4242,
+    "icmp4_seq": 1,
+    "icmp4_payload": "XFR-105-to-109-test-0001",
+
+    "pcap_filter": "icmp and (host 192.168.0.105 or host 192.168.0.109)",
+    "pcap_set_filter": true,
+
+    "net_rx_enable": false,
+    "rx_fire": false,
+    "tx_fire": false
+  }
 }
 end note
 
 note right of NET_WAIT_RX
 {
-  "rx_fire": true,
-  "tx_fire": false,
-
-  "_tck": { "enable": true }
+  "_send": {
+    "net_rx_enable": true,
+    "rx_fire": true,
+    "tx_fire": false
+  }
 }
 end note
 
 note right of NET_DONE
 {
-  "rx_fire": false,
-  "tx_fire": false,
-
+  "_send": {
+    "net_rx_enable": false,
+    "rx_fire": false,
+    "tx_fire": false
+  },
   "_commit": { "subject": "NET.rx_done" }
 }
 end note
