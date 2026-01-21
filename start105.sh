@@ -32,9 +32,8 @@ sleep 0.5
 # ----------------------------------------------------------------------
 echo "[3/5] Starting FSM / TCK / XFR..."
 
-$MPP/fsm/fsm-net-tck 5001 &
-$MPP/tck/fsm-net 5002 &
-$MPP/tck/net-tck 5003 &
+$MPP/tck/fsm-net-tck 5001 &
+$MPP/fsm/fsm-net 5002 &
 
 $MPP/xfr/xfr 6000 &
 $MPP/tck/fsm-xfr-tck 6001 &
@@ -48,11 +47,11 @@ sleep 1
 echo "[4/5] Loading FSM definitions..."
 
 printf '{"verb":"PUT","resource":"fsm","body":{"fsm_text":%s,"target_sba":5000,"tck_sba":5001,"run":true}}' \
-  "$(jq -Rs . < /usr/local/mpp/fsm/fsm-net.puml)" \
+  "$(jq -Rs . < /usr/local/mpp/fsm/fsm-net-tx.puml)" \
   | nc -u -w1 127.0.0.1 5002
 
 printf '{"verb":"PUT","resource":"fsm","body":{"fsm_text":%s,"target_sba":6000,"tck_sba":6001,"run":true}}' \
-  "$(jq -Rs . < /usr/local/mpp/fsm/xfr-send.puml)" \
+  "$(jq -Rs . < /usr/local/mpp/fsm/fsm-xfr-send.puml)" \
   | nc -u -w1 127.0.0.1 6002
 
 sleep 0.5
@@ -62,9 +61,10 @@ sleep 0.5
 # ----------------------------------------------------------------------
 echo "[5/5] Enabling TCKs and starting XFR..."
 
-echo '{"enable":true,"target_sba":5000}' | nc -u -w1 127.0.0.1 5003
 echo '{"enable":true,"target_sba":5002}' | nc -u -w1 127.0.0.1 5001
 echo '{"enable":true,"target_sba":6002}' | nc -u -w1 127.0.0.1 6001
+
+sleep 2
 
 echo '{"belief":{"subject":"FSM.XFR.start","polarity":true}}' \
   | nc -u -w1 127.0.0.1 4000
