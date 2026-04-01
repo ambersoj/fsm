@@ -1,0 +1,37 @@
+@startuml
+
+state XFR_INIT
+state XFR_IDLE
+state XFR_RX_PROGRESS
+state XFR_RX_DONE
+
+XFR_INIT --> XFR_IDLE : belief XFR.init.done
+XFR_IDLE --> XFR_RX_PROGRESS : belief XFR.mode.recv
+XFR_RX_PROGRESS --> XFR_RX_DONE : belief XFR.rx.done
+XFR_RX_DONE --> XFR_IDLE : true
+
+note right of XFR_INIT
+{
+    "_send":
+    {
+        
+    }
+}
+end note
+
+note right of XFR_IDLE
+{
+}
+end note
+
+note right of XFR_RX_PROGRESS
+{
+}
+end note
+
+note right of XFR_RX_DONE
+{
+}
+end note
+
+@enduml

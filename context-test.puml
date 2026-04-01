@@ -1,0 +1,36 @@
+@startuml
+
+state XFR_IDLE
+state XFR_INIT
+state XFR_WAIT_RX
+state XFR_DONE
+
+XFR_IDLE --> XFR_INIT : true
+XFR_INIT --> XFR_WAIT_RX : true
+XFR_WAIT_RX --> XFR_DONE : belief NET.rx_done {"chunk":"$REG.XFR.chunk_index"}
+
+note right of XFR_INIT
+{
+  "mode": "recv"
+}
+end note
+
+note right of XFR_OPEN
+{
+  "mode": "recv"
+}
+end note
+
+note right of XFR_WAIT_RX
+{
+  "mode": "recv"
+}
+end note
+
+note right of XFR_DONE
+{
+  "mode": "recv"
+}
+end note
+
+@enduml

@@ -51,27 +51,33 @@ protected:
 private:
     int bls_sba_ = mpp::BLS_PORT;
 
-    std::map<std::string, bool> observed_beliefs_;
+    struct ObservedBelief {
+        bool polarity;
+        json context;
+    };
+
+    std::map<std::string, ObservedBelief> observed_beliefs_;
 
     // -------------------------------------------------------------------------
     // FSM definition
     // -------------------------------------------------------------------------
+    struct BeliefGuard {
+        std::string subject;
+        json        context;   // empty == subject-only
+    };
+
     struct Transition {
         std::string from;
         std::string to;
-        json        guards;          // register guards (key=value)
-        std::vector<std::string> beliefs; // belief subjects required
+        std::vector<BeliefGuard> belief_guards;
     };
 
     std::string fsm_text_;
     std::vector<std::string> state_order_;
     std::map<std::string, json> state_notes_;
     std::map<std::string, std::vector<Transition>> transitions_;
-
-    // -------------------------------------------------------------------------
-    // Runtime belief snapshot (polled from BLS)
-    // -------------------------------------------------------------------------
-    std::map<std::string, bool> beliefs_;
+    // NEW
+    bool belief_context_matches(const json& belief_ctx, const json& guard_ctx);
 
     // -------------------------------------------------------------------------
     // Registers
@@ -102,12 +108,16 @@ private:
     // Utilities
     // -------------------------------------------------------------------------
     bool parse_plantuml(const std::string& text);
-    void substitute_register_refs(json& j);
 
     void set_error(const std::string& msg,
                    const char* file,
                    int line,
                    const char* func);
+
+    // -------------------------------------------------------------------------
+    // Register snapshot (read-only for guards)
+    // -------------------------------------------------------------------------
+    json register_snapshot_;
 };
 
 #define FSM_ERROR(obj, msg) \

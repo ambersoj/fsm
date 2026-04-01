@@ -71,9 +71,13 @@ void Fsm::apply_snapshot(const json& j)
             regs_.loaded_ = parse_plantuml(fsm_text_);
             if (regs_.loaded_ && !state_order_.empty()) {
                 regs_.current_state_ = state_order_.front();
-                regs_.run_ = true;
+//                regs_.run_ = true;
             }
         }
+        return;
+    }
+    if (verb == "PUT" && j.value("resource","") == "registers") {
+        register_snapshot_ = j.value("body", json::object());
         return;
     }
 
@@ -82,6 +86,15 @@ void Fsm::apply_snapshot(const json& j)
         if (action == "run")  regs_.run_ = true;
         if (action == "stop") regs_.run_ = false;
     }
+        // ---- NET status injection ----
+    if (j.value("component", "") == "NET") {
+
+        if (j.contains("tx_done"))
+            register_snapshot_["NET.tx_done"] = j["tx_done"];
+
+        if (j.contains("rx_done"))
+            register_snapshot_["NET.rx_done"] = j["rx_done"];
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -89,7 +102,6 @@ void Fsm::apply_snapshot(const json& j)
 // -----------------------------------------------------------------------------
 void Fsm::on_tick()
 {
-    poll_bls();
     step();
 }
 
@@ -114,9 +126,6 @@ void Fsm::step()
         regs_.transition_fired_ = true;
         regs_.last_error_.clear();
 
-        // State belief
-        commit(("FSM.state." + t.to).c_str(), true);
-
         auto note_it = state_notes_.find(t.to);
         if (note_it != state_notes_.end()) {
             regs_.last_applied_state_ = t.to;
@@ -132,13 +141,38 @@ void Fsm::step()
 // -----------------------------------------------------------------------------
 bool Fsm::evaluate_transition(const Transition& t)
 {
-    for (const auto& subject : t.beliefs) {
-        auto it = observed_beliefs_.find(subject);
-        if (it == observed_beliefs_.end())
+    for (const auto& bg : t.belief_guards) {
+
+        auto it = register_snapshot_.find(bg.subject);
+        if (it == register_snapshot_.end())
             return false;
-        if (!it->second)
+
+        if (!it.value().get<bool>())
             return false;
     }
+
+    return true;
+}
+
+bool Fsm::belief_context_matches(const json& belief_ctx,
+                                 const json& guard_ctx)
+{
+    if (guard_ctx.empty())
+        return true;
+
+    if (!belief_ctx.is_object() || !guard_ctx.is_object())
+        return false;
+
+    for (auto it = guard_ctx.begin(); it != guard_ctx.end(); ++it) {
+        const std::string& key = it.key();
+
+        if (!belief_ctx.contains(key))
+            return false;
+
+        if (belief_ctx[key] != it.value())
+            return false;
+    }
+
     return true;
 }
 
@@ -150,11 +184,11 @@ void Fsm::apply_state_note(const json& note)
     if (note.contains("_commit"))
         route_commit(note["_commit"]);
 
-    if (note.contains("_send"))
-        route_send(note["_send"]);
+    if (note.contains("_send_regs"))
+        route_send(note["_send_regs"]);
 
-    if (note.contains("_tck"))
-        route_tck(note["_tck"]);
+    if (note.contains("_tck_ctl"))
+        route_tck(note["_tck_ctl"]);
 }
 
 void Fsm::route_commit(const json& c)
@@ -173,7 +207,6 @@ void Fsm::route_send(json payload)
     if (regs_.target_sba_ == 0)
         return;
 
-    substitute_register_refs(payload);
     send_json(payload, regs_.target_sba_);
 }
 
@@ -190,11 +223,7 @@ void Fsm::route_tck(const json& t)
 // -----------------------------------------------------------------------------
 void Fsm::poll_bls()
 {
-    json req;
-    req["verb"] = "GET";
-    req["resource"] = "beliefs";
 
-    send_json(req, bls_sba_);
 }
 
 void Fsm::on_message(const json& j)
@@ -202,15 +231,24 @@ void Fsm::on_message(const json& j)
     if (!j.is_object())
         return;
 
-    if (j.contains("beliefs")) {
-        observed_beliefs_.clear();
-        for (auto it = j["beliefs"].begin();
-             it != j["beliefs"].end(); ++it)
-        {
-            observed_beliefs_[it.key()] = it.value().get<bool>();
-        }
+    // tick
+    if (j.contains("tick")) {
+        on_tick();
         return;
     }
+
+    // NET status
+    if (j.value("component", "") == "NET") {
+
+        if (j.contains("tx_done"))
+            register_snapshot_["NET.tx_done"] = j["tx_done"];
+
+        if (j.contains("rx_done"))
+            register_snapshot_["NET.rx_done"] = j["rx_done"];
+
+        return;
+    }
+
 }
 
 // -----------------------------------------------------------------------------
@@ -243,19 +281,38 @@ bool Fsm::parse_plantuml(const std::string& text)
             Transition t;
             t.from = from;
             t.to   = to;
-            t.guards = json::object();
+            // NEW t.guards removed
 
             if (colon != std::string::npos) {
                 std::string conds = rest.substr(colon + 1);
                 trim(conds);
 
+                // NEW BeliefGuard Code
                 if (conds.rfind("belief ", 0) == 0) {
-                    std::string subj = conds.substr(7);
-                    trim(subj);
-                    t.beliefs.push_back(subj);
+                    std::string rest = conds.substr(7);
+                    trim(rest);
+
+                    BeliefGuard bg;
+
+                    auto brace = rest.find('{');
+                    if (brace == std::string::npos) {
+                        bg.subject = rest;
+                        bg.context = json::object();
+                    } else {
+                        bg.subject = rest.substr(0, brace);
+                        trim(bg.subject);
+
+                        std::string ctx = rest.substr(brace);
+                        try {
+                            bg.context = json::parse(ctx);
+                        } catch (const std::exception& e) {
+                            set_error("Invalid guard context JSON", __FILE__, __LINE__, __func__);
+                            return false;
+                        }
+                    }
+                    t.belief_guards.push_back(bg);
                 }
             }
-
             transitions_[from].push_back(t);
             continue;
         }
@@ -284,23 +341,6 @@ bool Fsm::parse_plantuml(const std::string& text)
     }
 
     return any;
-}
-
-// -----------------------------------------------------------------------------
-// Substitution
-// -----------------------------------------------------------------------------
-void Fsm::substitute_register_refs(json& j)
-{
-    for (auto it = j.begin(); it != j.end(); ++it) {
-        if (!it->is_string())
-            continue;
-
-        const std::string s = it->get<std::string>();
-        if (s.rfind("$REG.", 0) != 0)
-            continue;
-
-        it.value() = nullptr; // placeholder until register polling exists
-    }
 }
 
 // -----------------------------------------------------------------------------

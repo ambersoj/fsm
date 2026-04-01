@@ -1,72 +1,45 @@
 #!/usr/bin/env bash
 set -e
 
-echo "=== MPP startup on 105 (XFR SEND) ==="
+echo "=== MPP startup on 105 (PING) ==="
 
 MPP=/usr/local/mpp
 
 # ----------------------------------------------------------------------
-# 1. Create executable variants
+# 1. Start core services
 # ----------------------------------------------------------------------
-echo "[1/5] Preparing executables..."
+echo "[1/4] Starting core services..."
 
-cp -f $MPP/fsm/fsm $MPP/fsm/fsm-net
-cp -f $MPP/fsm/fsm $MPP/fsm/fsm-xfr
-
-cp -f $MPP/tck/tck $MPP/tck/net-tck
-cp -f $MPP/tck/tck $MPP/tck/fsm-net-tck
-cp -f $MPP/tck/tck $MPP/tck/fsm-xfr-tck
-
-# ----------------------------------------------------------------------
-# 2. Start core services
-# ----------------------------------------------------------------------
-echo "[2/5] Starting core services..."
-
-$MPP/bls/bls 4000 &
 $MPP/net/net 5000 &
 
 sleep 0.5
 
 # ----------------------------------------------------------------------
-# 3. Start FSMs, TCKs, XFR
+# 2. Start FSMs, TCKs, XFR
 # ----------------------------------------------------------------------
-echo "[3/5] Starting FSM / TCK / XFR..."
+echo "[2/4] Starting FSM / TCK"
 
-$MPP/tck/fsm-net-tck 5001 &
-$MPP/fsm/fsm-net 5002 &
-
-$MPP/xfr/xfr 6000 &
-$MPP/tck/fsm-xfr-tck 6001 &
-$MPP/fsm/fsm-xfr 6002 &
+$MPP/fsm/fsm 5001 &
+$MPP/tck/tck 5002 &
 
 sleep 1
 
 # ----------------------------------------------------------------------
-# 4. Load FSMs
+# 3. Load FSM
 # ----------------------------------------------------------------------
-echo "[4/5] Loading FSM definitions..."
+echo "[3/4] Loading FSM definition"
 
-printf '{"verb":"PUT","resource":"fsm","body":{"fsm_text":%s,"target_sba":5000,"tck_sba":5001,"run":true}}' \
-  "$(jq -Rs . < /usr/local/mpp/fsm/fsm-net-tx.puml)" \
-  | nc -u -w1 127.0.0.1 5002
-
-printf '{"verb":"PUT","resource":"fsm","body":{"fsm_text":%s,"target_sba":6000,"tck_sba":6001,"run":true}}' \
-  "$(jq -Rs . < /usr/local/mpp/fsm/fsm-xfr-send.puml)" \
-  | nc -u -w1 127.0.0.1 6002
+printf '{"verb":"PUT","resource":"fsm","body":{"fsm_text":%s,"target_sba":5000,"tck_sba":5002,"run":true}}' \
+  "$(jq -Rs . < /usr/local/mpp/fsm/ping.puml)" \
+  | nc -u -w1 127.0.0.1 5001
 
 sleep 0.5
 
 # ----------------------------------------------------------------------
-# 5. Enable TCKs and start flow
+# 4. Enable TCK and start flow
 # ----------------------------------------------------------------------
-echo "[5/5] Enabling TCKs and starting XFR..."
+echo "[4/4] Enabling TCK"
 
-echo '{"enable":true,"target_sba":5002}' | nc -u -w1 127.0.0.1 5001
-echo '{"enable":true,"target_sba":6002}' | nc -u -w1 127.0.0.1 6001
-
-sleep 2
-
-echo '{"belief":{"subject":"FSM.XFR.start","polarity":true}}' \
-  | nc -u -w1 127.0.0.1 4000
+echo '{"enable":true,"target_sba":5001}' | nc -u -w1 127.0.0.1 5002
 
 echo "=== MPP 105 startup complete ==="

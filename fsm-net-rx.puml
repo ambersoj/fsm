@@ -1,18 +1,22 @@
 @startuml
 
 state NET_IDLE
-state NET_CONFIGURE
 state NET_INIT
+state NET_CONFIGURE
 state NET_READY
+state NET_TX
+state NET_WAIT_TX
 state NET_WAIT_RX
 state NET_DONE
 
-NET_IDLE --> NET_CONFIGURE : true
-NET_CONFIGURE --> NET_INIT : true
-NET_INIT --> NET_READY : true
-NET_READY --> NET_WAIT_RX : true
+NET_IDLE --> NET_INIT : true
+NET_INIT --> NET_CONFIGURE : true
+NET_CONFIGURE --> NET_READY : true
+NET_READY --> NET_TX : true
+NET_TX --> NET_WAIT_TX : true
+NET_WAIT_TX --> NET_WAIT_RX : true
 NET_WAIT_RX --> NET_DONE : belief NET.rx_done
-NET_DONE
+NET_DONE --> NET_WAIT_RX : true
 
 note right of NET_IDLE
 {
@@ -49,6 +53,12 @@ end note
 note right of NET_CONFIGURE
 {
   "_send": {
+    "libnet_create": true,
+    "libnet_destroy": false,
+
+    "pcap_create": true,
+    "pcap_destroy": false,
+
     "eth_enabled": true,
     "eth_src_mac": "bc:e9:2f:80:3b:56",
     "eth_dst_mac": "ec:b1:d7:52:8c:52",
@@ -76,13 +86,38 @@ note right of NET_CONFIGURE
 }
 end note
 
+note right of NET_READY
+{
+  "_commit": { "subject": "FSM.NET.ready" }
+}
+end note
+
+note right of NET_TX
+{
+  "_send": {
+  "tx_fire": true,
+  "rx_fire": false
+  }
+}
+end note
+
+note right of NET_WAIT_TX
+{
+  "_send": {
+  "tx_fire": false,
+  "rx_fire": false
+  }
+}
+end note
+
 note right of NET_WAIT_RX
 {
   "_send": {
     "net_rx_enable": true,
     "rx_fire": true,
     "tx_fire": false
-  }
+  },
+  "_commit": { "subject": "NET.rx_done", "polarity": false }
 }
 end note
 
@@ -98,3 +133,4 @@ note right of NET_DONE
 end note
 
 @enduml
+

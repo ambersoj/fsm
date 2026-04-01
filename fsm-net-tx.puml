@@ -26,15 +26,15 @@ note right of NET_IDLE
 note right of NET_INIT
 {
   "_send": {
-  "libnet_create": true,
-  "libnet_destroy": false,
+    "libnet_create": true,
+    "libnet_destroy": false,
 
-  "eth_enabled": true,
-  "ip4_enabled": true,
-  "icmp4_enabled": true,
+    "eth_enabled": true,
+    "ip4_enabled": true,
+    "icmp4_enabled": true,
 
-  "tx_fire": false,
-  "rx_fire": false
+    "tx_fire": false,
+    "rx_fire": false
   }
 }
 end note
@@ -42,30 +42,30 @@ end note
 note right of NET_CONFIGURE
 {
   "_send": {
-  "libnet_create": true,
-  "libnet_device": "eno1",
+    "libnet_create": true,
+    "libnet_device": "eno1",
 
-  "eth_enabled": true,
-  "eth_src_mac": "ec:b1:d7:52:8c:52",
-  "eth_dst_mac": "bc:e9:2f:80:3b:56",
-  "eth_type": 2048,
+    "eth_enabled": true,
+    "eth_src_mac": "ec:b1:d7:52:8c:52",
+    "eth_dst_mac": "bc:e9:2f:80:3b:56",
+    "eth_type": 2048,
 
-  "ip4_enabled": true,
-  "ip4_src": "192.168.0.105",
-  "ip4_dst": "192.168.0.109",
-  "ip4_ttl": 64,
+    "ip4_enabled": true,
+    "ip4_src": "192.168.0.105",
+    "ip4_dst": "192.168.0.109",
+    "ip4_ttl": 64,
 
-  "icmp4_enabled": true,
-  "icmp4_type": 8,
-  "icmp4_code": 0,
-  "icmp4_id": 4242,
-  "icmp4_seq": 1,
-  "icmp4_payload": "XFR-105-to-109-test-0001",
+    "icmp4_enabled": true,
+    "icmp4_type": 8,
+    "icmp4_code": 0,
+    "icmp4_id": 4242,
+    "icmp4_seq": 1,
+    "icmp4_payload": "XFR-105-to-109-test-0001",
 
-  "pcap_create": true,
-  "pcap_device": "eno1",
-  "pcap_filter": "icmp and (host 192.168.0.105 or host 192.168.0.109)",
-  "pcap_set_filter": true
+    "pcap_create": true,
+    "pcap_device": "eno1",
+    "pcap_filter": "icmp and (host 192.168.0.105 or host 192.168.0.109)",
+    "pcap_set_filter": true
   }
 }
 end note
@@ -79,8 +79,8 @@ end note
 note right of NET_TX
 {
   "_send": {
-  "tx_fire": true,
-  "rx_fire": false
+    "tx_fire": true,
+    "rx_fire": false
   }
 }
 end note
@@ -99,9 +99,9 @@ end note
 note right of NET_WAIT_RX
 {
   "_send": {
-  "net_rx_enable": true,
-  "tx_fire": false,
-  "rx_fire": true
+    "net_rx_enable": true,
+    "tx_fire": false,
+    "rx_fire": true
   }
 }
 end note
@@ -109,10 +109,10 @@ end note
 note right of NET_DONE
 {
   "_send": {
-  "net_rx_enable": false,
-  "tx_fire": false,
-  "rx_fire": false
-  }
+    "net_rx_enable": false,
+    "tx_fire": false,
+    "rx_fire": false
+  },
   "_commit": { "subject": "FSM.NET.chunk_sent" }
 }
 end note
