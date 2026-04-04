@@ -15,7 +15,8 @@ using json = nlohmann::ordered_json;
 struct FsmRegisters
 {
     int         sba_        = 0;
-    int         target_sba_ = 0;
+    int         target_sba_net_ = 0;
+    int         target_sba_xfr_ = 0;
     int         tck_sba_    = 0;
 
     bool        run_        = false;
@@ -72,12 +73,14 @@ private:
         std::vector<BeliefGuard> belief_guards;
     };
 
+    json belief_store_;
+
+    void substitute(json& j);
+    
     std::string fsm_text_;
     std::vector<std::string> state_order_;
     std::map<std::string, json> state_notes_;
     std::map<std::string, std::vector<Transition>> transitions_;
-    // NEW
-    bool belief_context_matches(const json& belief_ctx, const json& guard_ctx);
 
     // -------------------------------------------------------------------------
     // Registers
@@ -96,13 +99,9 @@ private:
     void apply_state_note(const json& note);
 
     void route_commit(const json& c); // _commit
-    void route_send(json payload);    // _send
+    void route_send_net(json payload);    // _send
+    void route_send_xfr(json payload);    // _send
     void route_tck(const json& t);    // _tck
-
-    // -------------------------------------------------------------------------
-    // BLS access (read-only)
-    // -------------------------------------------------------------------------
-    void poll_bls();  // pulls latest belief snapshot
 
     // -------------------------------------------------------------------------
     // Utilities

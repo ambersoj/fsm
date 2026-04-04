@@ -1,0 +1,113 @@
+@startuml
+
+state START
+state INIT_NET
+state INIT_XFR
+state OPEN
+state REQUEST_CHUNK
+state SEND
+state WAIT_ACK
+
+START --> INIT_NET : true
+INIT_NET --> INIT_XFR : true
+INIT_XFR --> OPEN : true
+OPEN -->  REQUEST_CHUNK : XFR.tx_opened
+REQUEST_CHUNK --> SEND : XFR.xfr_tx_valid
+SEND --> WAIT_ACK : true
+WAIT_ACK --> REQUEST_CHUNK : NET.tx_valid
+
+note right of START
+{
+}
+end note
+
+note right of INIT_NET
+{
+    "_send_regs_net": {
+        "libnet_create": true,
+        "libnet_destroy": false,
+        "libnet_device": "eno1",
+
+        "eth_enabled": true,
+        "eth_src_mac": "ec:b1:d7:52:8c:52",
+        "eth_dst_mac": "bc:e9:2f:80:3b:56",
+        "eth_type": 2048,
+
+        "ip4_enabled": true,
+        "ip4_src": "192.168.0.105",
+        "ip4_dst": "192.168.0.109",
+        "ip4_ttl": 64,
+
+        "icmp4_enabled": true,
+        "icmp4_type": 8,
+        "icmp4_code": 0,
+        "icmp4_id": 4242,
+        "icmp4_seq": 0,
+        "icmp4_payload": "",
+
+        "pcap_create": true,
+        "pcap_device": "eno1",
+        "pcap_filter": "icmp and icmp[icmptype] == 0 and icmp[4:2] == 4242",
+        "pcap_set_filter": true
+    },
+    "_send_regs_xfr": {
+    }
+}
+end note
+
+note right of INIT_XFR
+{
+    "_send_regs_net": {
+    },
+    "_send_regs_xfr": {
+        "xfr_tx_open": false,
+        "xfr_tx_path": "/usr/local/mpp/tx-file.txt",
+        "xfr_tx_next": false,
+        "xfr_rx_open": false,
+        "xfr_rx_path": "/usr/local/mpp/rx-file.txt"
+    }
+}
+end note
+
+note right of OPEN
+{
+    "_send_regs_net": {
+    },
+    "_send_regs_xfr": {
+        "xfr_tx_open": true
+    }
+}
+end note
+
+note right of REQUEST_CHUNK
+{
+    "_send_regs_net": {
+    },
+    "_send_regs_xfr": {
+        "xfr_tx_next": true
+    }
+}
+end note
+
+note right of SEND
+{
+    "_send_regs_net": {
+        "icmp4_payload": "$XFR.buffer",
+        "icmp4_seq": "$XFR.seq",
+        "tx_fire": true
+    },
+    "_send_regs_xfr": {
+    }
+}
+end note
+
+note right of WAIT_ACK
+{
+    "_send_regs_net": {
+    },
+    "_send_regs_xfr": {
+    }
+}
+end note
+
+@enduml

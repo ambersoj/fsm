@@ -45,7 +45,8 @@ void Fsm::apply_snapshot(const json& j)
         json r;
         r["component"]        = "FSM";
         r["sba"]              = regs_.sba_;
-        r["target_sba"]       = regs_.target_sba_;
+        r["target_sba_net"]   = regs_.target_sba_net_;
+        r["target_sba_xfr"]   = regs_.target_sba_xfr_;
         r["tck_sba"]          = regs_.tck_sba_;
         r["run"]              = regs_.run_;
         r["loaded"]           = regs_.loaded_;
@@ -60,8 +61,11 @@ void Fsm::apply_snapshot(const json& j)
     if (verb == "PUT" && j.value("resource","") == "fsm") {
         const auto& body = j["body"];
 
-        if (body.contains("target_sba"))
-            regs_.target_sba_ = body["target_sba"].get<int>();
+        if (body.contains("target_sba_net"))
+            regs_.target_sba_net_ = body["target_sba_net"].get<int>();
+
+        if (body.contains("target_sba_xfr"))
+            regs_.target_sba_xfr_ = body["target_sba_xfr"].get<int>();
 
         if (body.contains("tck_sba"))
             regs_.tck_sba_ = body["tck_sba"].get<int>();
@@ -71,7 +75,6 @@ void Fsm::apply_snapshot(const json& j)
             regs_.loaded_ = parse_plantuml(fsm_text_);
             if (regs_.loaded_ && !state_order_.empty()) {
                 regs_.current_state_ = state_order_.front();
-//                regs_.run_ = true;
             }
         }
         return;
@@ -85,15 +88,6 @@ void Fsm::apply_snapshot(const json& j)
         const std::string action = j.value("action","");
         if (action == "run")  regs_.run_ = true;
         if (action == "stop") regs_.run_ = false;
-    }
-        // ---- NET status injection ----
-    if (j.value("component", "") == "NET") {
-
-        if (j.contains("tx_done"))
-            register_snapshot_["NET.tx_done"] = j["tx_done"];
-
-        if (j.contains("rx_done"))
-            register_snapshot_["NET.rx_done"] = j["rx_done"];
     }
 }
 
@@ -154,26 +148,37 @@ bool Fsm::evaluate_transition(const Transition& t)
     return true;
 }
 
-bool Fsm::belief_context_matches(const json& belief_ctx,
-                                 const json& guard_ctx)
+void Fsm::substitute(json& j)
 {
-    if (guard_ctx.empty())
-        return true;
-
-    if (!belief_ctx.is_object() || !guard_ctx.is_object())
-        return false;
-
-    for (auto it = guard_ctx.begin(); it != guard_ctx.end(); ++it) {
-        const std::string& key = it.key();
-
-        if (!belief_ctx.contains(key))
-            return false;
-
-        if (belief_ctx[key] != it.value())
-            return false;
+    if (j.is_object()) {
+        for (auto& [k,v] : j.items())
+            substitute(v);
     }
+    else if (j.is_array()) {
+        for (auto& v : j)
+            substitute(v);
+    }
+    else if (j.is_string()) {
+        std::string s = j.get<std::string>();
 
-    return true;
+        if (!s.empty() && s[0] == '$') {
+
+            s.erase(0,1); // remove $
+
+            auto dot = s.find('.');
+            if (dot == std::string::npos)
+                return;
+
+            std::string comp  = s.substr(0,dot);
+            std::string field = s.substr(dot+1);
+
+            if (belief_store_.contains(comp) &&
+                belief_store_[comp].contains(field))
+            {
+                j = belief_store_[comp][field];
+            }
+        }
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -184,8 +189,11 @@ void Fsm::apply_state_note(const json& note)
     if (note.contains("_commit"))
         route_commit(note["_commit"]);
 
-    if (note.contains("_send_regs"))
-        route_send(note["_send_regs"]);
+    if (note.contains("_send_regs_net"))
+        route_send_net(note["_send_regs_net"]);
+
+    if (note.contains("_send_regs_xfr"))
+        route_send_xfr(note["_send_regs_xfr"]);
 
     if (note.contains("_tck_ctl"))
         route_tck(note["_tck_ctl"]);
@@ -202,12 +210,24 @@ void Fsm::route_commit(const json& c)
            c.value("context", json::object()));
 }
 
-void Fsm::route_send(json payload)
+void Fsm::route_send_net(json payload)
 {
-    if (regs_.target_sba_ == 0)
+    if (regs_.target_sba_net_ == 0)
         return;
 
-    send_json(payload, regs_.target_sba_);
+    substitute(payload);
+
+    send_json(payload, regs_.target_sba_net_);
+}
+
+void Fsm::route_send_xfr(json payload)
+{
+    if (regs_.target_sba_xfr_ == 0)
+        return;
+
+    substitute(payload);
+
+    send_json(payload, regs_.target_sba_xfr_);
 }
 
 void Fsm::route_tck(const json& t)
@@ -216,14 +236,6 @@ void Fsm::route_tck(const json& t)
         return;
 
     send_json(t, regs_.tck_sba_);
-}
-
-// -----------------------------------------------------------------------------
-// BLS (Read-only)
-// -----------------------------------------------------------------------------
-void Fsm::poll_bls()
-{
-
 }
 
 void Fsm::on_message(const json& j)
@@ -237,18 +249,32 @@ void Fsm::on_message(const json& j)
         return;
     }
 
-    // NET status
     if (j.value("component", "") == "NET") {
 
-        if (j.contains("tx_done"))
-            register_snapshot_["NET.tx_done"] = j["tx_done"];
+        for (auto& [k,v] : j.items()) {
+            if (k == "component") continue;
+            belief_store_["NET"][k] = v;
+        }
 
-        if (j.contains("rx_done"))
-            register_snapshot_["NET.rx_done"] = j["rx_done"];
+        if (j.contains("rx_valid"))
+            register_snapshot_["NET.rx_valid"] = j["rx_valid"];
 
         return;
     }
 
+    // XFR status
+    if (j.value("component", "") == "XFR") {
+
+        for (auto& [k,v] : j.items()) {
+            if (k == "component") continue;
+            belief_store_["XFR"][k] = v;
+        }
+
+        if (j.contains("xfr_tx_valid"))
+            register_snapshot_["XFR.xfr_tx_valid"] = j["xfr_tx_valid"];
+
+        return;
+    }
 }
 
 // -----------------------------------------------------------------------------
