@@ -14,12 +14,12 @@ using json = nlohmann::ordered_json;
 // -----------------------------------------------------------------------------
 struct FsmRegisters
 {
-    int         sba_        = 0;
+    int         sba_            = 0;
     int         target_sba_net_ = 0;
     int         target_sba_xfr_ = 0;
-    int         tck_sba_    = 0;
+    int         tck_sba_        = 0;
+    int         obs_sba_         = 0;
 
-    bool        run_        = false;
     bool        loaded_     = false;
 
     std::string current_state_;
@@ -40,9 +40,6 @@ public:
 
     // ---- control plane ----
     void apply_snapshot(const json& j);
-
-    // ---- time plane ----
-    void on_tick();   // ← THE ONLY PLACE step() is called
 
     void on_message(const json& j);
 
@@ -76,12 +73,12 @@ private:
     json belief_store_;
 
     void substitute(json& j);
-    
+
     std::string fsm_text_;
     std::vector<std::string> state_order_;
     std::map<std::string, json> state_notes_;
     std::map<std::string, std::vector<Transition>> transitions_;
-
+    static std::string guard_to_string(const Transition& t);
     // -------------------------------------------------------------------------
     // Registers
     // -------------------------------------------------------------------------
@@ -101,7 +98,7 @@ private:
     void route_commit(const json& c); // _commit
     void route_send_net(json payload);    // _send
     void route_send_xfr(json payload);    // _send
-    void route_tck(const json& t);    // _tck
+    void route_send_tck(json payload);    // _tck
 
     // -------------------------------------------------------------------------
     // Utilities

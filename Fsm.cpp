@@ -28,11 +28,8 @@ Fsm::Fsm(int sba)
 // -----------------------------------------------------------------------------
 void Fsm::apply_snapshot(const json& j)
 {
-    // ---- TICK ----
     if (j.value("tick", false)) {
-        if (regs_.run_) {
-            on_tick();
-        }
+        step();
         return;
     }
     
@@ -48,7 +45,7 @@ void Fsm::apply_snapshot(const json& j)
         r["target_sba_net"]   = regs_.target_sba_net_;
         r["target_sba_xfr"]   = regs_.target_sba_xfr_;
         r["tck_sba"]          = regs_.tck_sba_;
-        r["run"]              = regs_.run_;
+        r["obs_sba"]          = regs_.obs_sba_;
         r["loaded"]           = regs_.loaded_;
         r["current_state"]    = regs_.current_state_;
         r["next_state"]       = regs_.next_state_;
@@ -70,6 +67,9 @@ void Fsm::apply_snapshot(const json& j)
         if (body.contains("tck_sba"))
             regs_.tck_sba_ = body["tck_sba"].get<int>();
 
+        if (body.contains("obs_sba"))
+            regs_.obs_sba_ = body["obs_sba"].get<int>();
+
         if (body.contains("fsm_text")) {
             fsm_text_ = body["fsm_text"].get<std::string>();
             regs_.loaded_ = parse_plantuml(fsm_text_);
@@ -84,19 +84,14 @@ void Fsm::apply_snapshot(const json& j)
         return;
     }
 
-    if (verb == "POST") {
-        const std::string action = j.value("action","");
-        if (action == "run")  regs_.run_ = true;
-        if (action == "stop") regs_.run_ = false;
-    }
 }
 
-// -----------------------------------------------------------------------------
-// Time Plane
-// -----------------------------------------------------------------------------
-void Fsm::on_tick()
+std::string Fsm::guard_to_string(const Transition& t)
 {
-    step();
+    if (t.belief_guards.empty())
+        return "true";
+
+    return t.belief_guards.front().subject;
 }
 
 // -----------------------------------------------------------------------------
@@ -112,17 +107,48 @@ void Fsm::step()
         return;
 
     for (const auto& t : it->second) {
+
         if (!evaluate_transition(t))
             continue;
 
-        regs_.next_state_ = t.to;
-        regs_.current_state_ = t.to;
+        // capture old state BEFORE transition
+        std::string from = regs_.current_state_;
+        std::string to   = t.to;
+
+        regs_.next_state_ = to;
+        regs_.current_state_ = to;
         regs_.transition_fired_ = true;
         regs_.last_error_.clear();
 
-        auto note_it = state_notes_.find(t.to);
+        // ---- TRANSITION TRACE ----
+        std::cerr
+            << "[FSM] "
+            << from
+            << " -> "
+            << to
+            << " via "
+            << guard_to_string(t)
+            << std::endl;
+
+        // ---- STATE TRACE ----
+        std::cerr
+            << "[FSM STATE] "
+            << regs_.current_state_
+            << std::endl;
+
+        // ---- OBS BROADCAST ----
+        if (regs_.obs_sba_ > 0) {
+            json j;
+            j["component"] = "FSM";
+            j["state"]     = regs_.current_state_;
+            j["from"]      = from;
+            j["to"]        = to;
+            send_json(j, regs_.obs_sba_);
+        }
+
+        auto note_it = state_notes_.find(to);
         if (note_it != state_notes_.end()) {
-            regs_.last_applied_state_ = t.to;
+            regs_.last_applied_state_ = to;
             apply_state_note(note_it->second);
         }
 
@@ -135,13 +161,24 @@ void Fsm::step()
 // -----------------------------------------------------------------------------
 bool Fsm::evaluate_transition(const Transition& t)
 {
-    for (const auto& bg : t.belief_guards) {
+    for (const auto& g : t.belief_guards) {
 
-        auto it = register_snapshot_.find(bg.subject);
+        auto it = register_snapshot_.find(g.subject);
         if (it == register_snapshot_.end())
             return false;
 
-        if (!it.value().get<bool>())
+        bool val = false;
+
+        if (it->is_boolean())
+            val = it->get<bool>();
+
+        else if (it->is_number())
+            val = it->get<int>() != 0;
+
+        else if (it->is_string())
+            val = (it->get<std::string>() == "true");
+
+        if (!val)
             return false;
     }
 
@@ -159,23 +196,17 @@ void Fsm::substitute(json& j)
             substitute(v);
     }
     else if (j.is_string()) {
+
         std::string s = j.get<std::string>();
 
         if (!s.empty() && s[0] == '$') {
 
             s.erase(0,1); // remove $
 
-            auto dot = s.find('.');
-            if (dot == std::string::npos)
-                return;
+            // Now s is like "XFR.seq" or "XFR.buffer"
 
-            std::string comp  = s.substr(0,dot);
-            std::string field = s.substr(dot+1);
-
-            if (belief_store_.contains(comp) &&
-                belief_store_[comp].contains(field))
-            {
-                j = belief_store_[comp][field];
+            if (register_snapshot_.contains(s)) {
+                j = register_snapshot_[s];
             }
         }
     }
@@ -195,8 +226,8 @@ void Fsm::apply_state_note(const json& note)
     if (note.contains("_send_regs_xfr"))
         route_send_xfr(note["_send_regs_xfr"]);
 
-    if (note.contains("_tck_ctl"))
-        route_tck(note["_tck_ctl"]);
+    if (note.contains("_send_regs_tck"))
+        route_send_tck(note["_send_regs_tck"]);
 }
 
 void Fsm::route_commit(const json& c)
@@ -230,48 +261,38 @@ void Fsm::route_send_xfr(json payload)
     send_json(payload, regs_.target_sba_xfr_);
 }
 
-void Fsm::route_tck(const json& t)
+void Fsm::route_send_tck(json payload)
 {
     if (regs_.tck_sba_ == 0)
         return;
 
-    send_json(t, regs_.tck_sba_);
+    substitute(payload);
+
+    send_json(payload, regs_.tck_sba_);
 }
 
 void Fsm::on_message(const json& j)
 {
     if (!j.is_object())
         return;
+    
+    std::cerr
+        << "[FSM RX] "
+        << j.dump()
+        << std::endl;
 
-    // tick
-    if (j.contains("tick")) {
-        on_tick();
-        return;
-    }
+    if (j.contains("component")) {
 
-    if (j.value("component", "") == "NET") {
+        std::string comp = j["component"].get<std::string>();
 
-        for (auto& [k,v] : j.items()) {
-            if (k == "component") continue;
-            belief_store_["NET"][k] = v;
+        for (auto it = j.begin(); it != j.end(); ++it) {
+
+            if (it.key() == "component")
+                continue;
+
+            std::string namespaced = comp + "." + it.key();
+            register_snapshot_[namespaced] = it.value();
         }
-
-        if (j.contains("rx_valid"))
-            register_snapshot_["NET.rx_valid"] = j["rx_valid"];
-
-        return;
-    }
-
-    // XFR status
-    if (j.value("component", "") == "XFR") {
-
-        for (auto& [k,v] : j.items()) {
-            if (k == "component") continue;
-            belief_store_["XFR"][k] = v;
-        }
-
-        if (j.contains("xfr_tx_valid"))
-            register_snapshot_["XFR.xfr_tx_valid"] = j["xfr_tx_valid"];
 
         return;
     }
@@ -291,8 +312,10 @@ bool Fsm::parse_plantuml(const std::string& text)
     bool any = false;
 
     while (std::getline(iss, line)) {
+
         auto arrow = line.find("-->");
         if (arrow != std::string::npos) {
+
             std::string from = line.substr(0, arrow);
             std::string rest = line.substr(arrow + 3);
 
@@ -307,43 +330,35 @@ bool Fsm::parse_plantuml(const std::string& text)
             Transition t;
             t.from = from;
             t.to   = to;
-            // NEW t.guards removed
 
+            // -------------------------------
+            // Parse condition
+            // -------------------------------
             if (colon != std::string::npos) {
+
                 std::string conds = rest.substr(colon + 1);
                 trim(conds);
 
-                // NEW BeliefGuard Code
-                if (conds.rfind("belief ", 0) == 0) {
-                    std::string rest = conds.substr(7);
-                    trim(rest);
+                // TRUE = unconditional
+                if (conds != "true" && !conds.empty()) {
 
                     BeliefGuard bg;
+                    bg.subject = conds;
+                    bg.context = json::object();
 
-                    auto brace = rest.find('{');
-                    if (brace == std::string::npos) {
-                        bg.subject = rest;
-                        bg.context = json::object();
-                    } else {
-                        bg.subject = rest.substr(0, brace);
-                        trim(bg.subject);
-
-                        std::string ctx = rest.substr(brace);
-                        try {
-                            bg.context = json::parse(ctx);
-                        } catch (const std::exception& e) {
-                            set_error("Invalid guard context JSON", __FILE__, __LINE__, __func__);
-                            return false;
-                        }
-                    }
                     t.belief_guards.push_back(bg);
                 }
             }
+
             transitions_[from].push_back(t);
             continue;
         }
 
+        // -------------------------------
+        // Parse notes
+        // -------------------------------
         if (line.rfind("note right of ", 0) == 0) {
+
             std::string state = line.substr(14);
             trim(state);
 
@@ -351,6 +366,7 @@ bool Fsm::parse_plantuml(const std::string& text)
                 state_order_.push_back(state);
 
             std::string body;
+
             while (std::getline(iss, line)) {
                 if (line.find("end note") != std::string::npos)
                     break;
@@ -360,7 +376,8 @@ bool Fsm::parse_plantuml(const std::string& text)
             try {
                 state_notes_[state] = json::parse(body);
                 any = true;
-            } catch (...) {
+            }
+            catch (...) {
                 state_notes_[state] = json{{"_raw", body}};
             }
         }

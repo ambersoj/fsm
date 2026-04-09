@@ -1,22 +1,47 @@
 @startuml
 
 state START
+state INIT_TCK
 state INIT_NET
 state INIT_XFR
 state OPEN
+state RX
 state WAIT_PACKET
 state WRITE_CHUNK
+state CLOSE
 state DONE
 
 START --> INIT_NET : true
 INIT_NET --> INIT_XFR : true
 INIT_XFR --> OPEN : true
-OPEN -->  WAIT_PACKET : XFR.rx_opened
-WAIT_PACKET --> WRITE_CHUNK : NET.rx_valid
-WRITE_CHUNK --> WAIT_PACKET : true
+OPEN -> WAIT_PACKET
+WAIT_PACKET -> WRITE_CHUNK : NET.rx_done
+WRITE_CHUNK -> DONE : NET.eof
+WRITE_CHUNK -> WAIT_PACKET : true
+DONE -> CLOSE : true
 
 note right of START
 {
+    "_send_regs_net": {
+    },
+    "_send_regs_xfr": {
+    },
+    "_send_regs_tck": {
+    }
+}
+end note
+
+note right of INIT_TCK
+{
+    "_send_regs_net": {
+    },
+    "_send_regs_xfr": {
+    },
+    "_send_regs_tck": {
+        "enable": false,
+        "period_ms": 100,
+        "step_count": 0
+    }
 }
 end note
 
@@ -45,9 +70,10 @@ note right of INIT_NET
         "icmp4_payload": "",
 
         "pcap_create": true,
-        "pcap_device": "eno1",
-        "pcap_filter": "icmp and icmp[icmptype] == 0 and icmp[4:2] == 4242",
-        "pcap_set_filter": true
+        "pcap_device": "enp1s0",
+        "pcap_filter": "icmp and src host 192.168.0.109",
+        "pcap_set_filter": true,
+        "net_rx_enable": true
     },
     "_send_regs_xfr": {
     }
@@ -60,9 +86,11 @@ note right of INIT_XFR
     },
     "_send_regs_xfr": {
         "xfr_tx_open": false,
+        "xfr_tx_close": false,
         "xfr_tx_path": "/usr/local/mpp/tx-file.txt",
         "xfr_tx_next": false,
         "xfr_rx_open": false,
+        "xfr_rx_close": false,
         "xfr_rx_path": "/usr/local/mpp/rx-file.txt"
     }
 }
@@ -78,15 +106,21 @@ note right of OPEN
 }
 end note
 
-note right of WAIT_PACKET
+note right of RX
 {
     "_send_regs_net": {
         "rx_fire": true
     },
     "_send_regs_xfr": {
-        "rx_seq": "$NET.seq",
-        "rx_buffer": "$NET.buffer",
-        "rx_len": "$NET.len"
+    }
+}
+end note
+
+note right of WAIT_PACKET
+{
+    "_send_regs_net": {
+    },
+    "_send_regs_xfr": {
     }
 }
 end note
@@ -96,7 +130,9 @@ note right of WRITE_CHUNK
     "_send_regs_net": {
     },
     "_send_regs_xfr": {
-        "xfr_rx_next": true
+        "rx_seq": "$NET.seq",
+        "rx_buffer": "$NET.buffer",
+        "rx_len": "$NET.len"
     }
 }
 end note
@@ -106,8 +142,23 @@ note right of DONE
     "_send_regs_net": {
     },
     "_send_regs_xfr": {
+        "xfr_tx_open": false,
+        "xfr_tx_path": "/usr/local/mpp/tx-file.txt",
+        "xfr_tx_next": false,
+        "xfr_rx_open": false,
+        "xfr_rx_path": "/usr/local/mpp/rx-file.txt",
+        "rx_seq": 0,
+        "rx_buffer": "",
+        "rx_len": 0
     }
 }
 end note
+
+note right of CLOSE
+{
+    "_send_regs_xfr": {
+        "xfr_rx_close": true
+    }
+}
 
 @enduml

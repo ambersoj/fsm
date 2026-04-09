@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "/usr/local/mpp/fsm/fsm",
-            "args": [5001],
+            "args": [5000],
             "stopAtEntry": false,
             "cwd": "/usr/local/mpp/fsm",
             "environment": [],

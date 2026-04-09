@@ -1,23 +1,55 @@
 @startuml
 
 state START
+state INIT_TCK
 state INIT_NET
 state INIT_XFR
 state OPEN
 state REQUEST_CHUNK
+state RECEIVE_CHUNK
 state SEND
+state WAIT_TX
 state WAIT_ACK
+state CLOSE
+state DONE
 
-START --> INIT_NET : true
+START --> INIT_TCK : true
+INIT_TCK --> INIT_NET : true
 INIT_NET --> INIT_XFR : true
 INIT_XFR --> OPEN : true
 OPEN -->  REQUEST_CHUNK : XFR.tx_opened
-REQUEST_CHUNK --> SEND : XFR.xfr_tx_valid
-SEND --> WAIT_ACK : true
-WAIT_ACK --> REQUEST_CHUNK : NET.tx_valid
+REQUEST_CHUNK --> DONE : XFR.tx_eof
+REQUEST_CHUNK --> RECEIVE_CHUNK : XFR.xfr_tx_valid
+RECEIVE_CHUNK --> SEND : true
+SEND --> WAIT_TX : NET.tx_done
+WAIT_TX --> WAIT_ACK : true
+WAIT_ACK --> DONE : XFR.tx_eof
+WAIT_ACK --> REQUEST_CHUNK : NET.rx_done
+DONE --> CLOSE : true
+CLOSE --> START
 
 note right of START
 {
+    "_send_regs_net": {
+    },
+    "_send_regs_xfr": {
+    },
+    "_send_regs_tck": {
+    }
+}
+end note
+
+note right of INIT_TCK
+{
+    "_send_regs_net": {
+    },
+    "_send_regs_xfr": {
+    },
+    "_send_regs_tck": {
+        "enable": false,
+        "period_ms": 100,
+        "step_count": 15
+    }
 }
 end note
 
@@ -47,8 +79,10 @@ note right of INIT_NET
 
         "pcap_create": true,
         "pcap_device": "eno1",
-        "pcap_filter": "icmp and icmp[icmptype] == 0 and icmp[4:2] == 4242",
-        "pcap_set_filter": true
+        "pcap_filter": "icmp and src host 192.168.0.109",
+        "pcap_set_filter": true,
+        "net_rx_enable": true
+
     },
     "_send_regs_xfr": {
     }
@@ -61,9 +95,11 @@ note right of INIT_XFR
     },
     "_send_regs_xfr": {
         "xfr_tx_open": false,
+        "xfr_tx_close": false,
         "xfr_tx_path": "/usr/local/mpp/tx-file.txt",
         "xfr_tx_next": false,
         "xfr_rx_open": false,
+        "xfr_rx_close": false,
         "xfr_rx_path": "/usr/local/mpp/rx-file.txt"
     }
 }
@@ -89,6 +125,15 @@ note right of REQUEST_CHUNK
 }
 end note
 
+note right of RECEIVE_CHUNK
+{
+    "_send_regs_net": {
+    },
+    "_send_regs_xfr": {
+    }
+}
+end note
+
 note right of SEND
 {
     "_send_regs_net": {
@@ -101,11 +146,51 @@ note right of SEND
 }
 end note
 
+note right of WAIT_TX
+{
+    "_send_regs_net": {
+        "rx_fire": true
+    },
+    "_send_regs_xfr": {
+    }
+}
+end note
+
 note right of WAIT_ACK
 {
     "_send_regs_net": {
     },
     "_send_regs_xfr": {
+    }
+}
+end note
+
+note right of CLOSE
+{
+    "_send_regs_net": {
+    },
+    "_send_regs_xfr": {
+        "xfr_tx_close": true
+    }
+}
+end note
+
+note right of DONE
+{
+    "_send_regs_net": {
+    },
+    "_send_regs_xfr": {
+        "xfr_tx_open": false,
+        "xfr_tx_close": false,
+        "xfr_tx_path": "/usr/local/mpp/tx-file.txt",
+        "xfr_tx_next": false,
+        "xfr_rx_open": false,
+        "xfr_rx_close": false,
+        "xfr_rx_path": "/usr/local/mpp/rx-file.txt",
+        "xfr_rx_next": false,
+        "rx_seq": 0,
+        "rx_buffer": "",
+        "rx_len": 0
     }
 }
 end note
